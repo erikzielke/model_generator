@@ -4,6 +4,7 @@ import junit.framework.TestCase;
 
 import javax.xml.bind.JAXB;
 import java.io.File;
+import java.io.InputStream;
 
 /**
  * Created by Erik on 10/6/13.
@@ -18,7 +19,7 @@ public class ConfigurationTest extends TestCase {
         jdbc.setPassword("Zwq93hhU");
 
         Generation generation = new Generation();
-        generation.setDestinationDir("C:\\Users\\Erik\\Documents\\model_generator\\src\\main\\java");
+        generation.setDestinationDir(".");
         generation.setDestinationPackage("dk");
 
         Naming naming = new Naming();
@@ -34,9 +35,10 @@ public class ConfigurationTest extends TestCase {
     }
 
     public void testInputConfiguration() throws Exception {
-        Configuration unmarshal = JAXB.unmarshal(new File("C:\\Users\\Erik\\Documents\\model_generator\\src\\main\\java\\com\\github\\erikzielke\\model_generator\\configuration\\config.xml"), Configuration.class);
+        InputStream resourceAsStream = getClass().getClassLoader().getResourceAsStream("config.xml");
+        Configuration unmarshal = JAXB.unmarshal(resourceAsStream, Configuration.class);
 
-        assertEquals("appsync_", unmarshal.getNaming().getTablePrefix());
+        assertEquals("myprefix_", unmarshal.getNaming().getTablePrefix());
         assertEquals(2, unmarshal.getExcludeTable().size());
     }
 }
