@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<configuration
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="src/main/java/com/github/erikzielke/model_generator/configuration/config.xsd">
+    <generation>
+        <destinationDir>C:/code</destinationDir>
+        <destinationPackage>com.example.model.generated</destinationPackage>
+    </generation>
+    <jdbc>
+        <password>mypassword</password>
+        <url>jdbc:mysql://localhost/mydatabase</url>
+        <username>myuser</username>
+    </jdbc>
+    <naming>
+        <tablePrefix>myprefix_</tablePrefix>
+    </naming>
+    <!-- Exclude patterns are java regexps.-->
+    <excludeTable>qrtz.*</excludeTable>
+</configuration>
