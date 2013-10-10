@@ -2,6 +2,7 @@ package com.github.erikzielke.model_generator.codegenerator;
 
 import com.github.erikzielke.model_generator.codegenerator.namingstrategy.DefaultNamingStrategy;
 import com.github.erikzielke.model_generator.codegenerator.namingstrategy.NamingStrategyInterface;
+import com.github.erikzielke.model_generator.configuration.Configuration;
 import com.github.erikzielke.model_generator.databaseinfo.TypeUtil;
 import com.github.erikzielke.model_generator.databasemodel.Column;
 import com.github.erikzielke.model_generator.databasemodel.Database;
@@ -10,6 +11,8 @@ import com.github.erikzielke.model_generator.databasemodel.Table;
 import com.sun.codemodel.*;
 import org.apache.commons.lang.StringUtils;
 
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import javax.sql.DataSource;
 import java.io.File;
 import java.io.IOException;
@@ -29,6 +32,12 @@ public class JavaCodeGenerator implements CodeGenerator {
     private JDefinedClass parameterSetter;
     private JDefinedClass idSetter;
     private NamingStrategyInterface namingStrategy = new DefaultNamingStrategy();
+    private Configuration configuration;
+    private JDefinedClass dataSourceHelper;
+
+    public JavaCodeGenerator(Configuration configuration) {
+        this.configuration = configuration;
+    }
 
     public NamingStrategyInterface getNamingStrategy() {
         return namingStrategy;
@@ -60,6 +69,7 @@ public class JavaCodeGenerator implements CodeGenerator {
 
     private void generateDaos(JPackage rootPackage, Database database) {
         try {
+            dataSourceHelper = generateDaoHelper(rootPackage);
             JDefinedClass superDao = generateSuperDao(rootPackage);
 
             for (Table table : database.getTables()) {
@@ -68,6 +78,37 @@ public class JavaCodeGenerator implements CodeGenerator {
         } catch (JClassAlreadyExistsException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private JDefinedClass generateDaoHelper(JPackage rootPackage) throws JClassAlreadyExistsException {
+        JDefinedClass dataSourceHelper = rootPackage._class(JMod.PUBLIC, "DataSourceHelper");
+        JMethod getDataSource = dataSourceHelper.method(JMod.PUBLIC, codeModel.ref(DataSource.class), "getDataSource");
+        JFieldVar dataSource = dataSourceHelper.field(JMod.PRIVATE, codeModel.ref(DataSource.class), "dataSource");
+        getDataSource.body()._return(dataSource);
+        JFieldVar instance = dataSourceHelper.field(JMod.PRIVATE | JMod.STATIC, dataSourceHelper, "instance");
+
+        JMethod constructor = dataSourceHelper.constructor(JMod.PRIVATE);
+        JBlock body = constructor.body();
+        JTryBlock jTryBlock = body._try();
+        JBlock tryBody = jTryBlock.body();
+
+        JClass initialContextClass = codeModel.ref(InitialContext.class);
+        JVar initial = tryBody.decl(initialContextClass, "initial", JExpr._new(initialContextClass));
+        JInvocation lookup = initial.invoke("lookup");
+        lookup.arg(configuration.getNaming().getJndi());
+        tryBody.assign(dataSource, JExpr.cast(codeModel.ref(DataSource.class), lookup));
+        JCatchBlock jCatchBlock = jTryBlock._catch(codeModel.ref(NamingException.class));
+        JVar exception = jCatchBlock.param("e");
+        JInvocation exp = JExpr._new(codeModel.ref(RuntimeException.class));
+        exp.arg(exception);
+        jCatchBlock.body()._throw(exp);
+
+
+        JMethod getInstance = dataSourceHelper.method(JMod.PUBLIC | JMod.STATIC, dataSourceHelper, "getInstance");
+        JBlock initBody = getInstance.body()._if(instance.eq(JExpr._null()))._then();
+        initBody.assign(instance, JExpr._new(dataSourceHelper));
+        getInstance.body()._return(instance);
+        return dataSourceHelper;
     }
 
     private JDefinedClass generateSuperDao(JPackage rootPackage) throws JClassAlreadyExistsException {
@@ -93,6 +134,9 @@ public class JavaCodeGenerator implements CodeGenerator {
         JClass beanArrayListClass = arrayListClass.narrow(beanClass);
 
         JFieldVar dataSource = superDao.field(JMod.PRIVATE, DataSource.class, "dataSource");
+
+        JMethod constructor = superDao.constructor(JMod.PUBLIC);
+        constructor.body().assign(dataSource, dataSourceHelper.staticInvoke("getInstance").invoke("getDataSource"));
 
         generateExecuteQuery(superDao, parameterSetter, beanArrayListClass, dataSource);
         generateExecuteInsert(superDao, parameterSetter, idSetter, dataSource);
@@ -260,6 +304,7 @@ public class JavaCodeGenerator implements CodeGenerator {
             String daoFQName = rootPackage.name() + "." + namingStrategy.getPojoName(table) + "Dao";
             JDefinedClass dao = codeModel._class(daoFQName);
             dao._extends(superDao.narrow(bean));
+
 
             generateCreateMethod(table, dao, bean);
             generateFindAll(table, dao, bean);

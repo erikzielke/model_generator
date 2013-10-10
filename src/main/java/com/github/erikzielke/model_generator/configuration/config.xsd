@@ -25,6 +25,7 @@
   <xs:complexType name="namingType">
     <xs:sequence>
       <xs:element type="xs:string" name="tablePrefix"/>
+      <xs:element type="xs:string" name="jndi"/>
     </xs:sequence>
   </xs:complexType>
 </xs:schema>

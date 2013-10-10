@@ -66,7 +66,7 @@ public class CommandLineRunner {
             DatabaseInfoCreator databaseInfoCreator = new DatabaseInfoCreatorImpl();
             Database database = databaseInfoCreator.create(configuration, connection);
 
-            JavaCodeGenerator javaCodeGenerator = new JavaCodeGenerator();
+            JavaCodeGenerator javaCodeGenerator = new JavaCodeGenerator(configuration);
             javaCodeGenerator.getNamingStrategy().setTablePrefix(configuration.getNaming().getTablePrefix());
             javaCodeGenerator.setPackageName(configuration.getGeneration().getDestinationPackage());
             javaCodeGenerator.setDestinationDir(file);

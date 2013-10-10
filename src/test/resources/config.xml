@@ -13,6 +13,7 @@
     </jdbc>
     <naming>
         <tablePrefix>myprefix_</tablePrefix>
+        <jndi>myprefix_</jndi>
     </naming>
     <!-- Exclude patterns are java regexps.-->
     <excludeTable>qrtz.*</excludeTable>

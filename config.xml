@@ -3,16 +3,17 @@
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="https://raw.github.com/erikzielke/model_generator/master/src/main/java/com/github/erikzielke/model_generator/configuration/config.xsd">
     <generation>
-        <destinationDir>.</destinationDir>
+        <destinationDir>src/main/java</destinationDir>
         <destinationPackage>com.example.model.generated</destinationPackage>
     </generation>
     <jdbc>
-        <password>mypassword</password>
-        <url>jdbc:mysql://localhost/mydatabase</url>
-        <username>myuser</username>
+        <password>Zwq93hhU</password>
+        <url>jdbc:mysql://localhost/mybatis</url>
+        <username>root</username>
     </jdbc>
     <naming>
         <tablePrefix>myprefix_</tablePrefix>
+        <jndi>myprefix_</jndi>
     </naming>
     <!-- Exclude patterns are java regexps.-->
     <excludeTable>qrtz.*</excludeTable>
