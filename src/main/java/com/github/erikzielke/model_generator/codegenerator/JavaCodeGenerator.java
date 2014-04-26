@@ -112,7 +112,7 @@ public class JavaCodeGenerator implements CodeGenerator {
     }
 
     private JDefinedClass generateSuperDao(JPackage rootPackage) throws JClassAlreadyExistsException {
-        JDefinedClass superDao = rootPackage._class(JMod.ABSTRACT, "Dao");
+        JDefinedClass superDao = rootPackage._class(JMod.PUBLIC | JMod.ABSTRACT, "Dao");
         JTypeVar beanClass = superDao.generify("T");
 
 
@@ -695,6 +695,12 @@ public class JavaCodeGenerator implements CodeGenerator {
     private void generateBean(JPackage rootPackage, Table table) {
         try {
             JDefinedClass bean = codeModel._class(rootPackage.name() + "." + namingStrategy.getPojoName(table));
+
+            List<String> beanInterfaces = configuration.getBeanInterface();
+            for (String beanInterface : beanInterfaces) {
+                bean._implements(codeModel.directClass(beanInterface));
+            }
+
             for (Column column : table.getColumns()) {
                 Class type = TypeUtil.sqlTypeToJavaClass(column.getType());
 

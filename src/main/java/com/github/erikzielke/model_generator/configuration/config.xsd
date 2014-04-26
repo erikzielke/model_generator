@@ -6,6 +6,7 @@
       <xs:element type="generationType" name="generation"/>
       <xs:element type="jdbcType" name="jdbc"/>
       <xs:element type="namingType" name="naming"/>
+      <xs:element type="xs:string" name="beanInterface" maxOccurs="unbounded" minOccurs="0"/>
       <xs:element type="xs:string" name="excludeTable" maxOccurs="unbounded" minOccurs="0"/>
     </xs:sequence>
   </xs:complexType>

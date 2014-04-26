@@ -15,6 +15,8 @@
         <tablePrefix>myprefix_</tablePrefix>
         <jndi>myprefix_</jndi>
     </naming>
+
+    <beanInterface>java.io.Serializable</beanInterface>
     <!-- Exclude patterns are java regexps.-->
     <excludeTable>qrtz.*</excludeTable>
     <excludeTable>qwe.*</excludeTable>

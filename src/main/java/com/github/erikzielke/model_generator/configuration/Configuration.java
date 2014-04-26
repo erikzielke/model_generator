@@ -13,9 +13,11 @@ public class Configuration {
     private Naming naming;
     private Generation generation;
     private List<String> excludeTable;
+    private List<String> beanInterface;
 
     public Configuration() {
         this.excludeTable = new ArrayList<String>();
+        this.beanInterface = new ArrayList<String>();
     }
 
     public Jdbc getJdbc() {
@@ -48,5 +50,13 @@ public class Configuration {
 
     public void setExcludeTable(List<String> excludeTable) {
         this.excludeTable = excludeTable;
+    }
+
+    public void setBeanInterface(List<String> beanInterface) {
+        this.beanInterface = beanInterface;
+    }
+
+    public List<String> getBeanInterface() {
+        return beanInterface;
     }
 }
