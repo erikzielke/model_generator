@@ -1,5 +1,12 @@
 package com.github.erikzielke.model_generator;
 
+import java.io.File;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+import javax.xml.bind.JAXB;
+
 import com.github.erikzielke.model_generator.codegenerator.JavaCodeGenerator;
 import com.github.erikzielke.model_generator.configuration.Configuration;
 import com.github.erikzielke.model_generator.configuration.Generation;
@@ -8,14 +15,6 @@ import com.github.erikzielke.model_generator.configuration.Naming;
 import com.github.erikzielke.model_generator.databaseinfo.DatabaseInfoCreator;
 import com.github.erikzielke.model_generator.databaseinfo.DatabaseInfoCreatorImpl;
 import com.github.erikzielke.model_generator.databasemodel.Database;
-import org.codehaus.jackson.map.PropertyNamingStrategy;
-
-import javax.xml.bind.JAXB;
-import java.io.File;
-import java.sql.Connection;
-import java.sql.Driver;
-import java.sql.DriverManager;
-import java.sql.SQLException;
 
 /**
  * This runs the generation from the command line.

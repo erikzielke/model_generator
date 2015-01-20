@@ -14,28 +14,24 @@ public class DefaultNamingStrategy implements NamingStrategyInterface {
         this.tablePrefix = tablePrefix;
     }
 
-    @Override
     public String getFieldName(Column column) {
         String fieldName = snakeCaseToCamelCase(column.getName());
         fieldName = fieldName.replaceAll("\\-", "_");
         return fieldName;
     }
 
-    @Override
     public String getSetterName(Column column) {
         String str = snakeCaseToCamelCase(column.getName());
         str = str.replaceAll("\\-", "_");
         return "set" + StringUtils.capitalize(str);
     }
 
-    @Override
     public String getGetterName(Column column) {
         String str = snakeCaseToCamelCase(column.getName());
         str = str.replaceAll("\\-", "_");
         return "get" + StringUtils.capitalize(str);
     }
 
-    @Override
     public String getPojoName(Table table) {
         if (tablePrefix != null && table.getName().startsWith(tablePrefix)) {
             return StringUtils.capitalize(snakeCaseToCamelCase(table.getName().replaceFirst(tablePrefix, "")));

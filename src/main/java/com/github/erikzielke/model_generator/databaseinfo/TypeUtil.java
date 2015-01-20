@@ -3,7 +3,6 @@ package com.github.erikzielke.model_generator.databaseinfo;
 import java.math.BigDecimal;
 import java.sql.Types;
 import java.util.Date;
-import java.util.Objects;
 
 /**
  * Created by Erik on 10/2/13.

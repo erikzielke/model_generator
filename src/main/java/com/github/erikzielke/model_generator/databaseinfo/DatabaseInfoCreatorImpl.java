@@ -16,7 +16,6 @@ import java.util.regex.Pattern;
 public class DatabaseInfoCreatorImpl implements DatabaseInfoCreator {
     private Configuration configuration;
 
-    @Override
     public Database create(Configuration configuration, Connection connection) {
         this.configuration = configuration;
         Database database = null;
