@@ -137,7 +137,7 @@ public class JavaCodeGenerator implements CodeGenerator {
         JMethod constructor = superDao.constructor(JMod.PUBLIC);
         constructor.body().assign(dataSource, dataSourceHelper.staticInvoke("getInstance").invoke("getDataSource"));
 
-        JFieldVar connectionT = superDao.field(JMod.PRIVATE, Connection.class, "connectionT");
+        JFieldVar connectionT = superDao.field(JMod.PROTECTED, Connection.class, "connectionT");
         JMethod constructorT = superDao.constructor(JMod.PUBLIC);
         constructorT.body().assign(JExpr.refthis("connectionT"), constructorT.param(Connection.class, "connectionT"));
         
