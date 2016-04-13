@@ -14,8 +14,7 @@ import org.apache.commons.lang.StringUtils;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.sql.DataSource;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.sql.*;
 import java.sql.Date;
 import java.util.*;
@@ -60,9 +59,150 @@ public class JavaCodeGenerator implements CodeGenerator {
         generateDaos(rootPackage, database);
 
         try {
+            writeQueryHelper(rootPackage);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        try {
             codeModel.build(destinationDir);
         } catch (IOException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private void writeQueryHelper(JPackage rootPackage) throws IOException {
+        String path = rootPackage.name().replace(".", File.separator);
+
+        File parent = new File(destinationDir, path);
+        File file = new File(parent, "QueryHelper.java");
+        if (!file.exists()) {
+            try {
+                if (!parent.exists()) {
+                    parent.mkdirs();
+                }
+
+                file.createNewFile();
+                BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)));
+                bufferedWriter.write("package " + rootPackage.name() + ";\n" +
+                        "\n" +
+                        "import javax.sql.DataSource;\n" +
+                        "import java.lang.reflect.Field;\n" +
+                        "import java.sql.Connection;\n" +
+                        "import java.sql.PreparedStatement;\n" +
+                        "import java.sql.ResultSet;\n" +
+                        "import java.sql.SQLException;\n" +
+                        "import java.util.ArrayList;\n" +
+                        "import java.util.HashMap;\n" +
+                        "import java.util.List;\n" +
+                        "\n" +
+                        "public class QueryHelper {\n" +
+                        "    public static <E> List<E> executeQuery(String sql, Dao.ParameterSetter parameters, Class<E> klazz) {\n" +
+                        "        DataSource dataSource = DataSourceHelper.getInstance().getDataSource();\n" +
+                        "        List<E> result = new ArrayList<E>();\n" +
+                        "        Connection connection = null;\n" +
+                        "        try {\n" +
+                        "            connection = dataSource.getConnection();\n" +
+                        "            PreparedStatement statement = connection.prepareStatement(sql);\n" +
+                        "            if (parameters!= null) {\n" +
+                        "                parameters.setParameters(statement);\n" +
+                        "            }\n" +
+                        "\n" +
+                        "            Field[] declaredFields = klazz.getDeclaredFields();\n" +
+                        "            HashMap<String, Field> fieldMap = new HashMap<String, Field>();\n" +
+                        "            for (Field declaredField : declaredFields) {\n" +
+                        "                declaredField.setAccessible(true);\n" +
+                        "                fieldMap.put(declaredField.getName(), declaredField);\n" +
+                        "            }\n" +
+                        "\n" +
+                        "            ResultSet resultSet = statement.executeQuery();\n" +
+                        "\n" +
+                        "            java.sql.ResultSetMetaData metaData = resultSet.getMetaData();\n" +
+                        "\n" +
+                        "            java.util.List<String> labels = new ArrayList<String>(metaData.getColumnCount());\n" +
+                        "            for (int i = 0; i < metaData.getColumnCount(); i++) {\n" +
+                        "                String columnLabel = metaData.getColumnLabel(i);\n" +
+                        "                labels.add(columnLabel);\n" +
+                        "            }\n" +
+                        "\n" +
+                        "            while (resultSet.next()) {\n" +
+                        "                try {\n" +
+                        "                    E instance = klazz.newInstance();\n" +
+                        "\n" +
+                        "                    for (String label : labels) {\n" +
+                        "                        Field field = fieldMap.get(label);\n" +
+                        "                        if (field != null) {\n" +
+                        "                            if (field.getType().equals(String.class)) {\n" +
+                        "                                field.set(instance, resultSet.getString(label));\n" +
+                        "                            } else if (field.getType().equals(java.util.Date.class)) {\n" +
+                        "                                java.sql.Timestamp timestamp = resultSet.getTimestamp(label);\n" +
+                        "                                field.set(instance, timestamp);\n" +
+                        "                            } else if (field.getType().equals(Integer.class)) {\n" +
+                        "                                int value = resultSet.getInt(label);\n" +
+                        "                                if (resultSet.wasNull()) {\n" +
+                        "                                    field.set(instance, null);\n" +
+                        "                                } else {\n" +
+                        "                                    field.set(instance, value);\n" +
+                        "                                }\n" +
+                        "                            } else if (field.getType().equals(int.class)) {\n" +
+                        "                                field.set(instance, resultSet.getInt(label));\n" +
+                        "                            } else if (field.getType().equals(Boolean.class)) {\n" +
+                        "                                boolean value = resultSet.getBoolean(label);\n" +
+                        "                                if (resultSet.wasNull()) {\n" +
+                        "                                    field.set(instance, null);\n" +
+                        "                                } else {\n" +
+                        "                                    field.set(instance, value);\n" +
+                        "                                }\n" +
+                        "                            } else if (field.getType().equals(boolean.class)) {\n" +
+                        "                                field.set(instance, resultSet.getBoolean(label));\n" +
+                        "                            } else if (field.getType().equals(Double.class)) {\n" +
+                        "                                double value = resultSet.getDouble(label);\n" +
+                        "                                if (resultSet.wasNull()) {\n" +
+                        "                                    field.set(instance, null);\n" +
+                        "                                } else {\n" +
+                        "                                    field.set(instance, value);\n" +
+                        "                                }\n" +
+                        "                            } else if (field.getType().equals(double.class)) {\n" +
+                        "                                field.set(instance, resultSet.getDouble(label));\n" +
+                        "                            }  else if (field.getType().equals(Float.class)) {\n" +
+                        "                                double value = resultSet.getFloat(label);\n" +
+                        "                                if (resultSet.wasNull()) {\n" +
+                        "                                    field.set(instance, null);\n" +
+                        "                                } else {\n" +
+                        "                                    field.set(instance, value);\n" +
+                        "                                }\n" +
+                        "                            } else if (field.getType().equals(float.class)) {\n" +
+                        "                                field.set(instance, resultSet.getFloat(label));\n" +
+                        "                            }\n" +
+                        "                        }\n" +
+                        "                    }\n" +
+                        "\n" +
+                        "                    result.add(instance);\n" +
+                        "                } catch (InstantiationException e) {\n" +
+                        "                    throw new RuntimeException(e);\n" +
+                        "                } catch (IllegalAccessException e) {\n" +
+                        "                    throw new RuntimeException(e);\n" +
+                        "                }\n" +
+                        "            }\n" +
+                        "        } catch (SQLException e) {\n" +
+                        "            throw new RuntimeException(e);\n" +
+                        "        } finally {\n" +
+                        "            if (connection!= null) {\n" +
+                        "                try {\n" +
+                        "                    connection.close();\n" +
+                        "                } catch (SQLException e) {\n" +
+                        "                    throw new RuntimeException(e);\n" +
+                        "                }\n" +
+                        "            }\n" +
+                        "        }\n" +
+                        "        return result;\n" +
+                        "    }\n" +
+                        "}\n");
+                bufferedWriter.flush();
+
+            } catch (Exception exception) {
+                exception.printStackTrace();
+            }
         }
     }
 
@@ -112,6 +252,9 @@ public class JavaCodeGenerator implements CodeGenerator {
 
     private JDefinedClass generateSuperDao(JPackage rootPackage) throws JClassAlreadyExistsException {
         JDefinedClass superDao = rootPackage._class(JMod.PUBLIC | JMod.ABSTRACT, "Dao");
+
+        JDefinedClass daoInterface = rootPackage._interface(JMod.PUBLIC, "DaoInterface");
+        JTypeVar beanClassI = daoInterface.generify("T");
         JTypeVar beanClass = superDao.generify("T");
 
 
@@ -123,7 +266,6 @@ public class JavaCodeGenerator implements CodeGenerator {
         idSetter = superDao._interface("IdSetter");
         JMethod setId = idSetter.method(JMod.PUBLIC, codeModel.VOID, "setId");
         setId.param(codeModel.INT, "id");
-
 
         JMethod createMethod = superDao.method(JMod.PUBLIC | JMod.ABSTRACT, beanClass, "create");
         createMethod.param(ResultSet.class, "result");
@@ -142,16 +284,42 @@ public class JavaCodeGenerator implements CodeGenerator {
         constructorT.body().assign(JExpr.refthis("connectionT"), constructorT.param(Connection.class, "connectionT"));
         
         generateExecuteQuery(superDao, parameterSetter, beanArrayListClass, dataSource);
+        JMethod executeQuery = daoInterface.method(JMod.NONE, beanArrayListClass, "executeQuery");
+        executeQuery.param(String.class, "sql");
+        executeQuery.param(parameterSetter, "parameters");
+
         generateExecuteInsert(superDao, parameterSetter, idSetter, dataSource);
+        generateFindFirst(superDao, parameterSetter, dataSource, beanArrayListClass, beanClass);
+        JMethod findFirstI = daoInterface.method(JMod.NONE, beanClass, "findFirst");
+        JVar sql = findFirstI.param(String.class, "sql");
+        JVar parameters = findFirstI.param(parameterSetter, "parameters");
+
+
         generateCount(superDao, dataSource);
         generateExecuteUpdateDelete(superDao, parameterSetter, dataSource);
 
         generateExecuteQueryT(superDao, parameterSetter, beanArrayListClass, connectionT);
         generateExecuteInsertT(superDao, parameterSetter, idSetter, connectionT);
         generateCountT(superDao, connectionT);
-        generateExecuteUpdateDeleteT(superDao, parameterSetter, connectionT);        
-        
+        generateExecuteUpdateDeleteT(superDao, parameterSetter, connectionT);
+
+
         return superDao;
+    }
+
+
+
+    private void generateFindFirst(JDefinedClass superDao, JDefinedClass parameterSetter, JFieldVar dataSource, JClass beanArrayListClass, JTypeVar beanClass) {
+        JMethod findFirstMethod = superDao.method(JMod.PUBLIC, beanClass, "findFirst");
+        JVar sql = findFirstMethod.param(String.class, "sql");
+        JVar parameters = findFirstMethod.param(parameterSetter, "parameters");
+        JBlock body = findFirstMethod.body();
+
+        JVar result = body.decl(beanArrayListClass, "result", body.invoke("executeQuery").arg(sql).arg(parameters));
+        JConditional isEmpty = body._if(result.invoke("isEmpty"));
+        isEmpty._then()._return(JExpr._null());
+        isEmpty._else()._return(result.invoke("get").arg(JExpr.lit(0)));
+
     }
 
     private void generateCount(JDefinedClass superDao, JFieldVar dataSource) {
@@ -326,7 +494,7 @@ public class JavaCodeGenerator implements CodeGenerator {
     
     private void generateExecuteQuery(JDefinedClass superDao, JDefinedClass parameterSetter, JClass beanArrayListClass,
                                       JFieldVar dataSource) {
-        JMethod executeQuery = superDao.method(JMod.PROTECTED, beanArrayListClass, "executeQuery");
+        JMethod executeQuery = superDao.method(JMod.PUBLIC, beanArrayListClass, "executeQuery");
         JVar sql = executeQuery.param(String.class, "sql");
         JVar parameters = executeQuery.param(parameterSetter, "parameters");
         JVar result = executeQuery.body().decl(beanArrayListClass, "result", JExpr._new(beanArrayListClass));
@@ -400,8 +568,35 @@ public class JavaCodeGenerator implements CodeGenerator {
             JDefinedClass bean = beansMap.get(table);
 
             String daoFQName = rootPackage.name() + "." + namingStrategy.getPojoName(table) + "Dao";
+            String daoInterfaceName = namingStrategy.getPojoName(table) + "DaoInterface";
+            String daoIFQName = rootPackage.name() + "." + daoInterfaceName;
             JDefinedClass dao = codeModel._class(daoFQName);
             dao._extends(superDao.narrow(bean));
+            JDefinedClass jDefinedClass = dao._implements(codeModel.directClass(daoIFQName));
+
+
+            String path = rootPackage.name().replace(".", File.separator);
+
+            File parent = new File(destinationDir, path);
+            File file = new File(parent, daoInterfaceName + ".java");
+            if (!file.exists()) {
+                try {
+                    if (!parent.exists()) {
+                        parent.mkdirs();
+                    }
+                    file.createNewFile();
+                    BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)));
+                    bufferedWriter.write("package "+rootPackage.name()+";\n" +
+                            "public interface " + daoInterfaceName + " extends DaoInterface<"+bean.name()+"> {\n" +
+                            "\n" +
+                            "}\n");
+                    bufferedWriter.close();
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
 
             //
             JMethod constructor = dao.constructor(JMod.PUBLIC);
