@@ -14,10 +14,19 @@ public class Configuration {
     private Generation generation;
     private List<String> excludeTable;
     private List<String> beanInterface;
+    private boolean java8interfaces;
 
     public Configuration() {
         this.excludeTable = new ArrayList<String>();
         this.beanInterface = new ArrayList<String>();
+    }
+
+    public boolean isJava8interfaces() {
+        return java8interfaces;
+    }
+
+    public void setJava8interfaces(boolean java8interfaces) {
+        this.java8interfaces = java8interfaces;
     }
 
     public Jdbc getJdbc() {

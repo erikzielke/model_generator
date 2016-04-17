@@ -7,14 +7,16 @@
         <destinationPackage>com.example.model.generated</destinationPackage>
     </generation>
     <jdbc>
-        <password>Zwq93hhU</password>
-        <url>jdbc:mysql://localhost/world</url>
-        <username>root</username>
+        <password></password>
+        <url>jdbc:mysql://localhost/push</url>
+        <username></username>
     </jdbc>
     <naming>
         <tablePrefix>myprefix_</tablePrefix>
         <jndi>myprefix_</jndi>
     </naming>
+    <java8interfaces>true</java8interfaces>
+
     <beanInterface>java.io.Serializable</beanInterface>
     <!-- Exclude patterns are java regexps.-->
     <excludeTable>qrtz.*</excludeTable>

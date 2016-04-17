@@ -17,6 +17,7 @@
     </naming>
 
     <beanInterface>java.io.Serializable</beanInterface>
+    <java8interfacess>true</java8interfacess>
     <!-- Exclude patterns are java regexps.-->
     <excludeTable>qrtz.*</excludeTable>
     <excludeTable>qwe.*</excludeTable>

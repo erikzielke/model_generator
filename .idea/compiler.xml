@@ -25,6 +25,8 @@
         <module name="ModelGenerator" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="ModelGenerator" target="1.5" />
+    </bytecodeTargetLevel>
   </component>
 </project>
-

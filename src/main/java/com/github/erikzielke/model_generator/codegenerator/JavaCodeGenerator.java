@@ -296,6 +296,7 @@ public class JavaCodeGenerator implements CodeGenerator {
 
 
         generateCount(superDao, dataSource);
+        generateCountRowsWithParameters(superDao, dataSource);
         generateExecuteUpdateDelete(superDao, parameterSetter, dataSource);
 
         generateExecuteQueryT(superDao, parameterSetter, beanArrayListClass, connectionT);
@@ -337,6 +338,46 @@ public class JavaCodeGenerator implements CodeGenerator {
         JInvocation prepareStatement = connection.invoke("prepareStatement");
         prepareStatement.arg(sql);
         JVar statement = tryBody.decl(statementClass, "statement", prepareStatement);
+        JVar resultSet = tryBody.decl(codeModel.ref(ResultSet.class), "result", statement.invoke("executeQuery"));
+        JInvocation getInt = resultSet.invoke("getInt");
+        getInt.arg(JExpr.lit(1));
+        tryBody._if(resultSet.invoke("next"))._then()._return(getInt);
+
+
+        JVar exception = catchBlock.param("e");
+        JInvocation newRuntimeException = JExpr._new(codeModel.ref(RuntimeException.class));
+        newRuntimeException.arg(exception);
+        catchBlock.body()._throw(newRuntimeException);
+
+        JBlock finallyAndConnectionNotNull = finallyBody._if(connection.ne(JExpr._null()))._then();
+        JTryBlock closingTryBlock = finallyAndConnectionNotNull._try();
+        closingTryBlock.body().add(connection.invoke("close"));
+        JCatchBlock closingCatch = closingTryBlock._catch(codeModel.ref(SQLException.class));
+        JVar e = closingCatch.param("e");
+        JInvocation newRuntimeExceptionClosing = JExpr._new(codeModel.ref(RuntimeException.class));
+        newRuntimeExceptionClosing.arg(e);
+        closingCatch.body()._throw(newRuntimeExceptionClosing);
+
+        countRows.body()._return(JExpr.lit(0));
+    }
+
+    private void generateCountRowsWithParameters(JDefinedClass superDao, JFieldVar dataSource) {
+        JMethod countRows = superDao.method(JMod.PUBLIC, codeModel.INT, "countRows");
+        JVar sql = countRows.param(String.class, "sql");
+        JVar paramteres = countRows.param(parameterSetter, "paramteres");
+        JVar connection = countRows.body().decl(codeModel.ref(Connection.class), "connection", JExpr._null());
+
+        JTryBlock insertTryBlock = countRows.body()._try();
+        JCatchBlock catchBlock = insertTryBlock._catch(codeModel.ref(SQLException.class));
+
+        JBlock finallyBody = insertTryBlock._finally();
+        JBlock tryBody = insertTryBlock.body();
+        tryBody.assign(connection, dataSource.invoke("getConnection"));
+        JClass statementClass = codeModel.ref(PreparedStatement.class);
+        JInvocation prepareStatement = connection.invoke("prepareStatement");
+        prepareStatement.arg(sql);
+        JVar statement = tryBody.decl(statementClass, "statement", prepareStatement);
+        tryBody._if(paramteres.ne(JExpr._null()))._then().add(paramteres.invoke("setParameters").arg(statement));
         JVar resultSet = tryBody.decl(codeModel.ref(ResultSet.class), "result", statement.invoke("executeQuery"));
         JInvocation getInt = resultSet.invoke("getInt");
         getInt.arg(JExpr.lit(1));
@@ -572,14 +613,16 @@ public class JavaCodeGenerator implements CodeGenerator {
             String daoIFQName = rootPackage.name() + "." + daoInterfaceName;
             JDefinedClass dao = codeModel._class(daoFQName);
             dao._extends(superDao.narrow(bean));
-            JDefinedClass jDefinedClass = dao._implements(codeModel.directClass(daoIFQName));
+            if (configuration.isJava8interfaces()) {
+                JDefinedClass jDefinedClass = dao._implements(codeModel.directClass(daoIFQName));
+            }
 
 
             String path = rootPackage.name().replace(".", File.separator);
 
             File parent = new File(destinationDir, path);
             File file = new File(parent, daoInterfaceName + ".java");
-            if (!file.exists()) {
+            if (configuration.isJava8interfaces() && !file.exists()) {
                 try {
                     if (!parent.exists()) {
                         parent.mkdirs();
