@@ -119,6 +119,7 @@ public class DatabaseInfoCreatorImpl implements DatabaseInfoCreator {
             String isAutoIncrement = columns.getString("IS_AUTOINCREMENT");
             column.setAutoIncrement("YES".equals(isAutoIncrement));
             column.setName(columnName);
+            column.setComment(columns.getString("REMARKS"));
             int isNullable = columns.getInt("NULLABLE");
             boolean nullable = false;
             switch (isNullable) {

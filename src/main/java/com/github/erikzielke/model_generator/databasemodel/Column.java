@@ -9,6 +9,7 @@ public class Column {
     private int type;
     private boolean isAutoIncrement;
     private boolean nullable;
+    private String comment;
 
     public String getName() {
         return name;
@@ -48,5 +49,13 @@ public class Column {
 
     public void setNullable(boolean nullable) {
         this.nullable = nullable;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment;
+    }
+
+    public String getComment() {
+        return comment;
     }
 }

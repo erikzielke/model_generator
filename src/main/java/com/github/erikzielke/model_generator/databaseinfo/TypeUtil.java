@@ -1,5 +1,10 @@
 package com.github.erikzielke.model_generator.databaseinfo;
 
+import com.github.erikzielke.model_generator.databasemodel.Column;
+import com.sun.codemodel.JClass;
+import com.sun.codemodel.JCodeModel;
+import com.sun.codemodel.JType;
+
 import java.math.BigDecimal;
 import java.sql.Types;
 import java.util.Date;
@@ -43,47 +48,55 @@ public class TypeUtil {
             case Types.VARBINARY:
             case Types.LONGVARBINARY:
                 return "BinaryStream";
+            case Types.OTHER:
+                return "String";
             default:
                 return null;
         }
     }
 
 
-    public static Class sqlTypeToJavaClass(int sqlType) {
+    public static JType sqlTypeToJavaClass(JCodeModel codeModel, Column column, int sqlType) {
         switch (sqlType) {
             case Types.BIT:
-                return Boolean.class;
+                return codeModel.ref(Boolean.class);
             case Types.TINYINT:
-                return Boolean.class;
+                return codeModel.ref(Boolean.class);
             case Types.SMALLINT:
-                return Short.class;
+                return codeModel.ref(Short.class);
             case Types.INTEGER:
-                return Integer.class;
+                return codeModel.ref(Integer.class);
             case Types.BIGINT:
-                return Long.class;
+                return codeModel.ref(Long.class);
             case Types.REAL:
-                return Float.class;
+                return codeModel.ref(Float.class);
             case Types.DOUBLE:
-                return Double.class;
+                return codeModel.ref(Double.class);
             case Types.FLOAT:
-                return Float.class;
+                return codeModel.ref(Float.class);
             case Types.NUMERIC:
             case Types.DECIMAL:
-                return BigDecimal.class;
+                return codeModel.ref(BigDecimal.class);
             case Types.DATE:
             case Types.TIME:
             case Types.TIMESTAMP:
-                return Date.class;
+                return codeModel.ref(Date.class);
             case Types.CHAR:
             case Types.VARCHAR:
             case Types.LONGVARCHAR:
-                return String.class;
+                return codeModel.ref(String.class);
             case Types.BINARY:
             case Types.VARBINARY:
             case Types.LONGVARBINARY:
-                return Object.class;
+                return codeModel.ref(Object.class);
             case Types.ARRAY:
-                return Object.class;
+                return codeModel.ref(Object.class);
+            case Types.OTHER:
+                if (column.getComment() == null || column.getComment().isEmpty()) {
+                    return codeModel.ref(String.class);
+                } else {
+                    return codeModel.directClass(column.getComment());
+                }
             default:
                 return null;
         }

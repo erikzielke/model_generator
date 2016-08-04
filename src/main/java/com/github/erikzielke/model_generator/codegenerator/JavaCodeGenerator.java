@@ -120,7 +120,7 @@ public class JavaCodeGenerator implements CodeGenerator {
                         "            java.sql.ResultSetMetaData metaData = resultSet.getMetaData();\n" +
                         "\n" +
                         "            java.util.List<String> labels = new ArrayList<String>(metaData.getColumnCount());\n" +
-                        "            for (int i = 0; i < metaData.getColumnCount(); i++) {\n" +
+                        "            for (int i = 1; i <= metaData.getColumnCount(); i++) {\n" +
                         "                String columnLabel = metaData.getColumnLabel(i);\n" +
                         "                labels.add(columnLabel);\n" +
                         "            }\n" +
@@ -209,7 +209,8 @@ public class JavaCodeGenerator implements CodeGenerator {
     private void generateDaos(JPackage rootPackage, Database database) {
         try {
             dataSourceHelper = generateDaoHelper(rootPackage);
-            JDefinedClass superDao = generateSuperDao(rootPackage);
+            JDefinedClass rowMapper = generateRowMapper(rootPackage);
+            JDefinedClass superDao = generateSuperDao(rootPackage, rowMapper);
 
             for (Table table : database.getTables()) {
                 generateDao(superDao, rootPackage, table);
@@ -219,12 +220,24 @@ public class JavaCodeGenerator implements CodeGenerator {
         }
     }
 
+    private JDefinedClass generateRowMapper(JPackage rootPackage) throws JClassAlreadyExistsException {
+        JDefinedClass rowMapper = rootPackage._interface("RowMapper");
+        JTypeVar t = rowMapper.generify("T");
+
+        rowMapper.method(JMod.PUBLIC, t, "map").param(codeModel.directClass("java.sql.ResultSet"), "resultSet");
+        return rowMapper;
+    }
+
     private JDefinedClass generateDaoHelper(JPackage rootPackage) throws JClassAlreadyExistsException {
         JDefinedClass dataSourceHelper = rootPackage._class(JMod.PUBLIC, "DataSourceHelper");
         JMethod getDataSource = dataSourceHelper.method(JMod.PUBLIC, codeModel.ref(DataSource.class), "getDataSource");
         JFieldVar dataSource = dataSourceHelper.field(JMod.PRIVATE, codeModel.ref(DataSource.class), "dataSource");
         getDataSource.body()._return(dataSource);
         JFieldVar instance = dataSourceHelper.field(JMod.PRIVATE | JMod.STATIC, dataSourceHelper, "instance");
+        JClass gsonClass = codeModel.directClass("com.google.gson.Gson");
+        JFieldVar gson = dataSourceHelper.field(JMod.PRIVATE, gsonClass, "gson", JExpr._new(gsonClass));
+
+        dataSourceHelper.method(JMod.PUBLIC, gsonClass, "getGson").body()._return(gson);
 
         JMethod constructor = dataSourceHelper.constructor(JMod.PRIVATE);
         JBlock body = constructor.body();
@@ -250,7 +263,7 @@ public class JavaCodeGenerator implements CodeGenerator {
         return dataSourceHelper;
     }
 
-    private JDefinedClass generateSuperDao(JPackage rootPackage) throws JClassAlreadyExistsException {
+    private JDefinedClass generateSuperDao(JPackage rootPackage, JDefinedClass rowMapper) throws JClassAlreadyExistsException {
         JDefinedClass superDao = rootPackage._class(JMod.PUBLIC | JMod.ABSTRACT, "Dao");
 
         JDefinedClass daoInterface = rootPackage._interface(JMod.PUBLIC, "DaoInterface");
@@ -284,6 +297,7 @@ public class JavaCodeGenerator implements CodeGenerator {
         constructorT.body().assign(JExpr.refthis("connectionT"), constructorT.param(Connection.class, "connectionT"));
         
         generateExecuteQuery(superDao, parameterSetter, beanArrayListClass, dataSource);
+        generateExecuteQueryWithRowMap(superDao, parameterSetter, beanArrayListClass, dataSource, rowMapper);
         JMethod executeQuery = daoInterface.method(JMod.NONE, beanArrayListClass, "executeQuery");
         executeQuery.param(String.class, "sql");
         executeQuery.param(parameterSetter, "parameters");
@@ -308,6 +322,61 @@ public class JavaCodeGenerator implements CodeGenerator {
         return superDao;
     }
 
+    private void generateExecuteQueryWithRowMap(JDefinedClass superDao, JDefinedClass parameterSetter, JClass beanArrayListClass, JFieldVar dataSource, JDefinedClass rowMapper) {
+
+        JMethod executeQuery = superDao.method(JMod.PUBLIC, Object.class, "executeQuery");
+        JTypeVar m = executeQuery.generify("M");
+
+        JClass resultListType= codeModel.ref(ArrayList.class).narrow(m);
+        executeQuery.type(resultListType);
+        JVar sql = executeQuery.param(String.class, "sql");
+        JVar parameters = executeQuery.param(parameterSetter, "parameters");
+        JVar mapper = executeQuery.param(rowMapper.narrow(m), "rowMapper");
+
+        JBlock body = executeQuery.body();
+        JVar resultList = body.decl(resultListType, "result", JExpr._new(resultListType));
+
+        JVar connection = executeQuery.body().decl(codeModel.ref(Connection.class), "connection", JExpr._null());
+        JTryBlock tryBlock = executeQuery.body()._try();
+
+
+        JBlock tryBody = tryBlock.body();
+        JCatchBlock catchBlock = tryBlock._catch(codeModel.ref(SQLException.class));
+        JBlock catchBlack = catchBlock.body();
+        JBlock finallyBlock = tryBlock._finally();
+
+        tryBody.assign(connection, dataSource.invoke("getConnection"));
+        JInvocation prepareStatement = connection.invoke("prepareStatement");
+        prepareStatement.arg(sql);
+        JVar statement = tryBody.decl(codeModel.ref(PreparedStatement.class), "statement", prepareStatement);
+        JInvocation setParameterInvocation = parameters.invoke("setParameters");
+        setParameterInvocation.arg(statement);
+        tryBody._if(parameters.ne(JExpr._null()))._then().add(setParameterInvocation);
+        JVar resultSet = tryBody.decl(codeModel.ref(ResultSet.class), "resultSet", statement.invoke("executeQuery"));
+        JWhileLoop whileLoop = tryBody._while(resultSet.invoke("next"));
+        JInvocation add = resultList.invoke("add");
+        JInvocation create = mapper.invoke("map");
+        create.arg(resultSet);
+        add.arg(create);
+        whileLoop.body().add(add);
+
+        JClass ref = codeModel.ref(RuntimeException.class);
+        JInvocation exp = JExpr._new(ref);
+        exp.arg(catchBlock.param("e"));
+        catchBlack._throw(exp);
+
+        JConditional ifConnection = finallyBlock._if(connection.ne(JExpr._null()));
+        JTryBlock finallyTryBlock = ifConnection._then()._try();
+        finallyTryBlock.body().add(connection.invoke("close"));
+        JCatchBlock finallyCatchBlock = finallyTryBlock._catch(codeModel.ref(SQLException.class));
+        JInvocation newRuntimeException = JExpr._new(codeModel.ref(RuntimeException.class));
+        newRuntimeException.arg(finallyCatchBlock.param("e"));
+        finallyCatchBlock.body()._throw(newRuntimeException);
+
+        executeQuery.body()._return(resultList);
+
+
+    }
 
 
     private void generateFindFirst(JDefinedClass superDao, JDefinedClass parameterSetter, JFieldVar dataSource, JClass beanArrayListClass, JTypeVar beanClass) {
@@ -720,7 +789,7 @@ public class JavaCodeGenerator implements CodeGenerator {
         }
 
         for (Column column : primaryKey.getColumns()) {
-            Class type = TypeUtil.sqlTypeToJavaClass(column.getType());
+            JType type = TypeUtil.sqlTypeToJavaClass(codeModel, column, column.getType());
             findByPrimaryKey.param(JMod.FINAL, type, namingStrategy.getFieldName(column));
         }
 
@@ -887,7 +956,11 @@ public class JavaCodeGenerator implements CodeGenerator {
                             invocation.arg(handleSetTime(column.getType(), beanObject.invoke(namingStrategy.getGetterName(column)).invoke("getTime")));
                             break;
                         default:
-                            invocation.arg(beanObject.invoke(namingStrategy.getGetterName(column)));
+                            if (column.getType() == Types.OTHER && column.getComment() != null) {
+                                invocation.arg(dataSourceHelper.staticInvoke("getInstance").invoke("getGson").invoke("toJson").arg(beanObject.invoke(namingStrategy.getGetterName(column))));
+                            } else {
+                                invocation.arg(beanObject.invoke(namingStrategy.getGetterName(column)));
+                            }
                     }
                     body.add(invocation);
                 } else {
@@ -902,7 +975,11 @@ public class JavaCodeGenerator implements CodeGenerator {
                             invocation.arg(handleSetTime(column.getType(), beanObject.invoke(namingStrategy.getGetterName(column)).invoke("getTime")));
                             break;
                         default:
-                            invocation.arg(beanObject.invoke(namingStrategy.getGetterName(column)));
+                            if (column.getType() == Types.OTHER && column.getComment() != null) {
+                                invocation.arg(dataSourceHelper.staticInvoke("getInstance").invoke("getGson").invoke("toJson").arg(beanObject.invoke(namingStrategy.getGetterName(column))));
+                            } else {
+                                invocation.arg(beanObject.invoke(namingStrategy.getGetterName(column)));
+                            }
                     }
                     nullCondition._then().add(invocation);
 
@@ -990,7 +1067,11 @@ public class JavaCodeGenerator implements CodeGenerator {
                             invocation.arg(handleSetTime(column.getType(), beanObject.invoke(namingStrategy.getGetterName(column)).invoke("getTime")));
                             break;
                         default:
-                            invocation.arg(beanObject.invoke(namingStrategy.getGetterName(column)));
+                            if (column.getType() == Types.OTHER && column.getComment() != null) {
+                                invocation.arg(dataSourceHelper.staticInvoke("getInstance").invoke("getGson").invoke("toJson").arg(beanObject.invoke(namingStrategy.getGetterName(column))));
+                            } else {
+                                invocation.arg(beanObject.invoke(namingStrategy.getGetterName(column)));
+                            }
                     }
                     body.add(invocation);
                 } else {
@@ -1005,7 +1086,11 @@ public class JavaCodeGenerator implements CodeGenerator {
                             invocation.arg(handleSetTime(column.getType(), beanObject.invoke(namingStrategy.getGetterName(column)).invoke("getTime")));
                             break;
                         default:
-                            invocation.arg(beanObject.invoke(namingStrategy.getGetterName(column)));
+                            if (column.getType() == Types.OTHER && column.getComment() != null) {
+                                invocation.arg(dataSourceHelper.staticInvoke("getInstance").invoke("getGson").invoke("toJson").arg(beanObject.invoke(namingStrategy.getGetterName(column))));
+                            } else {
+                                invocation.arg(beanObject.invoke(namingStrategy.getGetterName(column)));
+                            }
                     }
                     nullCondition._then().add(invocation);
 
@@ -1109,13 +1194,13 @@ public class JavaCodeGenerator implements CodeGenerator {
                         getValue = invoke1;
                         break;
                 }
-                setValue.arg(getValue);
-                createMethod.body().add(setValue);
+
+                createValue(createMethod, column, getValue, setValue);
             } else {
-                Class dataType = TypeUtil.sqlTypeToJavaClass(column.getType());
+                JType dataType = TypeUtil.sqlTypeToJavaClass(codeModel, column, column.getType());
                 JInvocation getValue = resultSet.invoke("get" + TypeUtil.sqlTypeToSetterGetter(column.getType()));
                 getValue.arg(column.getName());
-                JVar field = createMethod.body().decl(codeModel.ref(dataType), namingStrategy.getFieldName(column), getValue);
+                JVar field = createMethod.body().decl(dataType, namingStrategy.getFieldName(column), getValue);
                 JConditional wasNull = createMethod.body()._if(resultSet.invoke("wasNull"));
                 wasNull._then().assign(field, JExpr._null());
 
@@ -1132,11 +1217,22 @@ public class JavaCodeGenerator implements CodeGenerator {
 
 
                 JInvocation setValue = resultVariable.invoke(namingStrategy.getSetterName(column));
-                setValue.arg(field);
-                createMethod.body().add(setValue);
+
+
+                createValue(createMethod, column, getValue, setValue);
             }
         }
         createMethod.body()._return(resultVariable);
+    }
+
+    private void createValue(JMethod createMethod, Column column, JInvocation getValue, JInvocation setValue) {
+        if (column.getType() == Types.OTHER && column.getComment() != null) {
+            setValue.arg(dataSourceHelper.staticInvoke("getInstance").invoke("getGson").invoke("fromJson").arg(getValue).arg(JExpr.dotclass(codeModel.directClass(column.getComment()))));
+            createMethod.body().add(setValue);
+        } else {
+            setValue.arg(getValue);
+            createMethod.body().add(setValue);
+        }
     }
 
     private void generateBeans(JPackage rootPackage, Database database) {
@@ -1155,12 +1251,12 @@ public class JavaCodeGenerator implements CodeGenerator {
             }
 
             for (Column column : table.getColumns()) {
-                Class type = TypeUtil.sqlTypeToJavaClass(column.getType());
+                JType type = TypeUtil.sqlTypeToJavaClass(codeModel, column, column.getType());
 
-                JType usedType = codeModel.ref(type);
+                JType usedType = type;
 
                 if (!column.isAutoIncrement() && !column.isNullable()) {
-                    JType unboxify = codeModel.ref(type).unboxify();
+                    JType unboxify = type.unboxify();
                     if (unboxify != null) {
                         usedType = unboxify;
                     }
