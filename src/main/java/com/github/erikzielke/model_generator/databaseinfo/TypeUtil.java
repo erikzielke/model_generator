@@ -6,6 +6,7 @@ import com.sun.codemodel.JCodeModel;
 import com.sun.codemodel.JType;
 
 import java.math.BigDecimal;
+import java.sql.Blob;
 import java.sql.Types;
 import java.util.Date;
 
@@ -50,6 +51,8 @@ public class TypeUtil {
                 return "BinaryStream";
             case Types.OTHER:
                 return "String";
+	    case Types.BLOB:
+		return "ByteArrayInputStream";
             default:
                 return null;
         }
@@ -97,6 +100,8 @@ public class TypeUtil {
                 } else {
                     return codeModel.directClass(column.getComment());
                 }
+	    case Types.BLOB:
+		return codeModel.ref(Blob.class);
             default:
                 return null;
         }

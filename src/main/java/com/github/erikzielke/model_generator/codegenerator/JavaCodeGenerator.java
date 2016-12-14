@@ -173,6 +173,8 @@ public class JavaCodeGenerator implements CodeGenerator {
                         "                                }\n" +
                         "                            } else if (field.getType().equals(float.class)) {\n" +
                         "                                field.set(instance, resultSet.getFloat(label));\n" +
+                        "                            } else if (field.getType().equals(Blob.class)) {\n" +
+                        "                                field.set(instance, resultSet.getByteArrayInputStream(label));\n" +
                         "                            }\n" +
                         "                        }\n" +
                         "                    }\n" +
