@@ -1,13 +1,12 @@
 package com.github.erikzielke.model_generator.databaseinfo;
 
-import com.github.erikzielke.model_generator.databasemodel.Column;
-import com.sun.codemodel.JClass;
-import com.sun.codemodel.JCodeModel;
-import com.sun.codemodel.JType;
-
 import java.math.BigDecimal;
 import java.sql.Types;
 import java.util.Date;
+
+import com.github.erikzielke.model_generator.databasemodel.Column;
+import com.sun.codemodel.JCodeModel;
+import com.sun.codemodel.JType;
 
 /**
  * Created by Erik on 10/2/13.
