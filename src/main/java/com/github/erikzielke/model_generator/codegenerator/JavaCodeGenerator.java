@@ -1219,6 +1219,7 @@ public class JavaCodeGenerator implements CodeGenerator {
                         break;
                 }
 
+                setValue.arg(getValue);
                 createValue(createMethod, column, getValue, setValue);
             } else {
                 JType dataType = TypeUtil.sqlTypeToJavaClass(codeModel, column, column.getType());
@@ -1239,10 +1240,8 @@ public class JavaCodeGenerator implements CodeGenerator {
                     default:
                 }
 
-
                 JInvocation setValue = resultVariable.invoke(namingStrategy.getSetterName(column));
-
-
+                setValue.arg(field);
                 createValue(createMethod, column, getValue, setValue);
             }
         }
@@ -1254,7 +1253,7 @@ public class JavaCodeGenerator implements CodeGenerator {
             setValue.arg(dataSourceHelper.staticInvoke("getInstance").invoke("getGson").invoke("fromJson").arg(getValue).arg(JExpr.dotclass(codeModel.directClass(column.getComment()))));
             createMethod.body().add(setValue);
         } else {
-            setValue.arg(getValue);
+//            setValue.arg(getValue);
             createMethod.body().add(setValue);
         }
     }

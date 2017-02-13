@@ -7,3 +7,7 @@
 
 .idea/workspace.xml
 .idea/jenkinsSettings.xml
+target/
+.classpath
+.project
+.settings/
