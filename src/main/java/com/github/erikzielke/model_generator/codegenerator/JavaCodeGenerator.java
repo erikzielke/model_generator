@@ -290,6 +290,12 @@ public class JavaCodeGenerator implements CodeGenerator {
         JClass arrayListClass = codeModel.ref(ArrayList.class);
         JClass beanArrayListClass = arrayListClass.narrow(beanClass);
 
+//        JClass linkedListClass = codeModel.ref(LinkedList.class);
+//        JClass beanLinkedListClass = linkedListClass.narrow(beanClass);        
+        
+        JClass listClass = codeModel.ref(List.class);
+        JClass beanListClass = listClass.narrow(beanClass);
+        
         JFieldVar dataSource = superDao.field(JMod.PRIVATE, DataSource.class, "dataSource");
         
         JMethod constructor = superDao.constructor(JMod.PUBLIC);
@@ -316,7 +322,7 @@ public class JavaCodeGenerator implements CodeGenerator {
         generateCountRowsWithParameters(superDao, dataSource);
         generateExecuteUpdateDelete(superDao, parameterSetter, dataSource);
 
-        generateExecuteQueryT(superDao, parameterSetter, beanArrayListClass, connectionT);
+        generateExecuteQueryT(superDao, parameterSetter, beanListClass, beanArrayListClass, connectionT);
         generateExecuteInsertT(superDao, parameterSetter, idSetter, connectionT);
         generateCountT(superDao, connectionT);
         generateExecuteUpdateDeleteT(superDao, parameterSetter, connectionT);
@@ -478,6 +484,8 @@ public class JavaCodeGenerator implements CodeGenerator {
         countRows._throws(SQLException.class);
         JVar sql = countRows.param(String.class, "sql");
 
+        JVar count = countRows.body().decl(codeModel.INT, "count", JExpr.lit(0));
+        
         JClass statementClass = codeModel.ref(PreparedStatement.class);
         JInvocation prepareStatement = connectionT.invoke("prepareStatement");
         prepareStatement.arg(sql);
@@ -485,9 +493,11 @@ public class JavaCodeGenerator implements CodeGenerator {
         JVar resultSet = countRows.body().decl(codeModel.ref(ResultSet.class), "result", statement.invoke("executeQuery"));
         JInvocation getInt = resultSet.invoke("getInt");
         getInt.arg(JExpr.lit(1));
-        countRows.body()._if(resultSet.invoke("next"))._then()._return(getInt);
+        countRows.body()._if(resultSet.invoke("next"))._then().assign(count, getInt);
 
-        countRows.body()._return(JExpr.lit(0));
+        countRows.body().add(statement.invoke("close"));
+        
+        countRows.body()._return(count);
     }    
     
     private void generateExecuteInsert(JDefinedClass superDao, JDefinedClass parameterSetter, JDefinedClass idSetter, JFieldVar dataSource) {
@@ -603,6 +613,8 @@ public class JavaCodeGenerator implements CodeGenerator {
             param.arg(getInt);
             block._if(keys.invoke("next"))._then().add(param);
         }
+        
+        insertQuery.body().add(statement.invoke("close"));
     }    
     
     private void generateExecuteQuery(JDefinedClass superDao, JDefinedClass parameterSetter, JClass beanArrayListClass,
@@ -650,14 +662,14 @@ public class JavaCodeGenerator implements CodeGenerator {
         executeQuery.body()._return(result);
     }
 
-    private void generateExecuteQueryT(JDefinedClass superDao, JDefinedClass parameterSetter, JClass beanArrayListClass,
-            JFieldVar connectionT) {
+    private void generateExecuteQueryT(JDefinedClass superDao, JDefinedClass parameterSetter,
+    		JClass beanListClass, JClass beanArrayListClass, JFieldVar connectionT) {
     	
-		JMethod executeQuery = superDao.method(JMod.PROTECTED, beanArrayListClass, "executeQueryT");
+		JMethod executeQuery = superDao.method(JMod.PROTECTED, beanListClass, "executeQueryT");
 		executeQuery._throws(SQLException.class);
 		JVar sql = executeQuery.param(String.class, "sql");
 		JVar parameters = executeQuery.param(parameterSetter, "parameters");
-		JVar result = executeQuery.body().decl(beanArrayListClass, "result", JExpr._new(beanArrayListClass));
+		JVar result = executeQuery.body().decl(beanListClass, "result", JExpr._new(beanArrayListClass));
 		
 		JInvocation prepareStatement = connectionT.invoke("prepareStatement");
 		prepareStatement.arg(sql);
@@ -672,6 +684,8 @@ public class JavaCodeGenerator implements CodeGenerator {
 		create.arg(resultSet);
 		add.arg(create);
 		whileLoop.body().add(add);
+		
+		executeQuery.body().add(statement.invoke("close"));
 		
 		executeQuery.body()._return(result);
 	}    
@@ -833,7 +847,13 @@ public class JavaCodeGenerator implements CodeGenerator {
         }
 
         queryInvocation.arg(JExpr._new(parameterSetter));
-        JClass beanList = codeModel.ref(ArrayList.class).narrow(bean);
+        JClass beanList = null;
+        if (!methodT) {
+        	beanList = codeModel.ref(ArrayList.class).narrow(bean);
+        }
+        else {
+        	beanList = codeModel.ref(List.class).narrow(bean);
+        }
 
         JVar result = findByPrimaryKey.body().decl(beanList, "result", queryInvocation);
         JConditional isEmpty = findByPrimaryKey.body()._if(result.invoke("isEmpty"));
@@ -1125,6 +1145,8 @@ public class JavaCodeGenerator implements CodeGenerator {
     private void generateFindAll(Table table, JDefinedClass dao, JDefinedClass bean, boolean methodT) {
         JClass arrayListClass = codeModel.ref(ArrayList.class);
         JClass beanArrayListClass = arrayListClass.narrow(bean);
+        JClass listClass = codeModel.ref(List.class);
+        JClass beanListClass = listClass.narrow(bean);
         
         JMethod findAll = null;
         JInvocation queryInvocation = null;
@@ -1133,7 +1155,7 @@ public class JavaCodeGenerator implements CodeGenerator {
         	queryInvocation = JExpr.invoke("executeQuery");
         }
         else {
-        	findAll = dao.method(JMod.PUBLIC, beanArrayListClass, "findAllT");
+        	findAll = dao.method(JMod.PUBLIC, beanListClass, "findAllT");
         	findAll._throws(SQLException.class);
         	queryInvocation = JExpr.invoke("executeQueryT");
         }
@@ -1145,13 +1167,15 @@ public class JavaCodeGenerator implements CodeGenerator {
     private void generateFindAllLimit(Table table, JDefinedClass dao, JDefinedClass bean, boolean methodT) {
         JClass arrayListClass = codeModel.ref(ArrayList.class);
         JClass beanArrayListClass = arrayListClass.narrow(bean);
+        JClass listClass = codeModel.ref(List.class);
+        JClass beanListClass = listClass.narrow(bean);        
         
         JMethod findAll = null;
         if (!methodT) {
         	findAll = dao.method(JMod.PUBLIC, beanArrayListClass, "findAll");
         }
         else {
-        	findAll = dao.method(JMod.PUBLIC, beanArrayListClass, "findAllT");
+        	findAll = dao.method(JMod.PUBLIC, beanListClass, "findAllT");
         	findAll._throws(SQLException.class);
         }
         findAll.param(codeModel.INT, "start");
@@ -1205,6 +1229,7 @@ public class JavaCodeGenerator implements CodeGenerator {
                         break;
                 }
 
+                setValue.arg(getValue);
                 createValue(createMethod, column, getValue, setValue);
             } else {
                 JType dataType = TypeUtil.sqlTypeToJavaClass(codeModel, column, column.getType());
@@ -1225,10 +1250,8 @@ public class JavaCodeGenerator implements CodeGenerator {
                     default:
                 }
 
-
                 JInvocation setValue = resultVariable.invoke(namingStrategy.getSetterName(column));
-
-
+                setValue.arg(field);
                 createValue(createMethod, column, getValue, setValue);
             }
         }
@@ -1240,7 +1263,7 @@ public class JavaCodeGenerator implements CodeGenerator {
             setValue.arg(dataSourceHelper.staticInvoke("getInstance").invoke("getGson").invoke("fromJson").arg(getValue).arg(JExpr.dotclass(codeModel.directClass(column.getComment()))));
             createMethod.body().add(setValue);
         } else {
-            setValue.arg(getValue);
+//            setValue.arg(getValue);
             createMethod.body().add(setValue);
         }
     }
