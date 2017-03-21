@@ -4,6 +4,7 @@ import com.github.erikzielke.model_generator.databasemodel.Column;
 import com.sun.codemodel.JClass;
 import com.sun.codemodel.JCodeModel;
 import com.sun.codemodel.JType;
+import java.io.InputStream;
 
 import java.math.BigDecimal;
 import java.sql.Blob;
@@ -45,14 +46,13 @@ public class TypeUtil {
             case Types.VARCHAR:
             case Types.LONGVARCHAR:
                 return "String";
+	    case Types.BLOB:
             case Types.BINARY:
             case Types.VARBINARY:
             case Types.LONGVARBINARY:
                 return "BinaryStream";
             case Types.OTHER:
                 return "String";
-	    case Types.BLOB:
-		return "ByteArrayInputStream";
             default:
                 return null;
         }
@@ -88,10 +88,11 @@ public class TypeUtil {
             case Types.VARCHAR:
             case Types.LONGVARCHAR:
                 return codeModel.ref(String.class);
+	    case Types.BLOB:
             case Types.BINARY:
             case Types.VARBINARY:
             case Types.LONGVARBINARY:
-                return codeModel.ref(Object.class);
+                return codeModel.ref(InputStream.class);
             case Types.ARRAY:
                 return codeModel.ref(Object.class);
             case Types.OTHER:
@@ -100,8 +101,6 @@ public class TypeUtil {
                 } else {
                     return codeModel.directClass(column.getComment());
                 }
-	    case Types.BLOB:
-		return codeModel.ref(Blob.class);
             default:
                 return null;
         }

@@ -95,6 +95,7 @@ public class JavaCodeGenerator implements CodeGenerator {
                         "import java.util.ArrayList;\n" +
                         "import java.util.HashMap;\n" +
                         "import java.util.List;\n" +
+			"import java.sql.Blob;"+
                         "\n" +
                         "public class QueryHelper {\n" +
                         "    public static <E> List<E> executeQuery(String sql, Dao.ParameterSetter parameters, Class<E> klazz) {\n" +
@@ -174,7 +175,7 @@ public class JavaCodeGenerator implements CodeGenerator {
                         "                            } else if (field.getType().equals(float.class)) {\n" +
                         "                                field.set(instance, resultSet.getFloat(label));\n" +
                         "                            } else if (field.getType().equals(Blob.class)) {\n" +
-                        "                                field.set(instance, resultSet.getByteArrayInputStream(label));\n" +
+                        "                                field.set(instance, resultSet.getBinaryStream(label));\n" +
                         "                            }\n" +
                         "                        }\n" +
                         "                    }\n" +
@@ -1190,6 +1191,13 @@ public class JavaCodeGenerator implements CodeGenerator {
                         invoke.arg(column.getName());
                         getValue = newInvoke;
                         break;
+		    case Types.BLOB:
+			JInvocation blobInvoke = JExpr._new(codeModel.ref(java.sql.Blob.class));
+                        JInvocation rsInvoke = resultSet.invoke("get" + TypeUtil.sqlTypeToSetterGetter(column.getType()));
+                        blobInvoke.arg(rsInvoke.invoke("getBinaryStream"));
+                        rsInvoke.arg(column.getName());
+                        getValue = blobInvoke;
+			break;
                     default:
                         JInvocation invoke1 = resultSet.invoke("get" + TypeUtil.sqlTypeToSetterGetter(column.getType()));
                         invoke1.arg(column.getName());
