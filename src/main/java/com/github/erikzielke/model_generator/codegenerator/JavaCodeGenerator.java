@@ -93,6 +93,7 @@ public class JavaCodeGenerator implements CodeGenerator {
                         "import java.sql.ResultSet;\n" +
                         "import java.sql.SQLException;\n" +
                         "import java.util.ArrayList;\n" +
+                        "import java.util.LinkedList;\n" +
                         "import java.util.HashMap;\n" +
                         "import java.util.List;\n" +
 			"import java.sql.Blob;"+
@@ -100,7 +101,7 @@ public class JavaCodeGenerator implements CodeGenerator {
                         "public class QueryHelper {\n" +
                         "    public static <E> List<E> executeQuery(String sql, Dao.ParameterSetter parameters, Class<E> klazz) {\n" +
                         "        DataSource dataSource = DataSourceHelper.getInstance().getDataSource();\n" +
-                        "        List<E> result = new ArrayList<E>();\n" +
+                        "        List<E> result = new LinkedList<E>();\n" +
                         "        Connection connection = null;\n" +
                         "        try {\n" +
                         "            connection = dataSource.getConnection();\n" +
@@ -202,6 +203,7 @@ public class JavaCodeGenerator implements CodeGenerator {
                         "    }\n" +
                         "}\n");
                 bufferedWriter.flush();
+                bufferedWriter.close();
 
             } catch (Exception exception) {
                 exception.printStackTrace();
@@ -287,16 +289,13 @@ public class JavaCodeGenerator implements CodeGenerator {
         createMethod.param(ResultSet.class, "result");
         createMethod._throws(codeModel.ref(SQLException.class));
 
-        JClass arrayListClass = codeModel.ref(ArrayList.class);
-        JClass beanArrayListClass = arrayListClass.narrow(beanClass);
-
-//        JClass linkedListClass = codeModel.ref(LinkedList.class);
-//        JClass beanLinkedListClass = linkedListClass.narrow(beanClass);        
+        JClass linkedListClass = codeModel.ref(LinkedList.class);
+        JClass beanLinkedListClass = linkedListClass.narrow(beanClass);
         
         JClass listClass = codeModel.ref(List.class);
         JClass beanListClass = listClass.narrow(beanClass);
         
-        JFieldVar dataSource = superDao.field(JMod.PRIVATE, DataSource.class, "dataSource");
+        JFieldVar dataSource = superDao.field(JMod.PROTECTED, DataSource.class, "dataSource");
         
         JMethod constructor = superDao.constructor(JMod.PUBLIC);
         constructor.body().assign(dataSource, dataSourceHelper.staticInvoke("getInstance").invoke("getDataSource"));
@@ -305,14 +304,14 @@ public class JavaCodeGenerator implements CodeGenerator {
         JMethod constructorT = superDao.constructor(JMod.PUBLIC);
         constructorT.body().assign(JExpr.refthis("connectionT"), constructorT.param(Connection.class, "connectionT"));
         
-        generateExecuteQuery(superDao, parameterSetter, beanArrayListClass, dataSource);
-        generateExecuteQueryWithRowMap(superDao, parameterSetter, beanArrayListClass, dataSource, rowMapper);
-        JMethod executeQuery = daoInterface.method(JMod.NONE, beanArrayListClass, "executeQuery");
+        generateExecuteQuery(superDao, parameterSetter, beanListClass, beanLinkedListClass, dataSource);
+        generateExecuteQueryWithRowMap(superDao, parameterSetter, dataSource, rowMapper);
+        JMethod executeQuery = daoInterface.method(JMod.NONE, beanListClass, "executeQuery");
         executeQuery.param(String.class, "sql");
         executeQuery.param(parameterSetter, "parameters");
 
         generateExecuteInsert(superDao, parameterSetter, idSetter, dataSource);
-        generateFindFirst(superDao, parameterSetter, dataSource, beanArrayListClass, beanClass);
+        generateFindFirst(superDao, parameterSetter, dataSource, beanListClass, beanClass);
         JMethod findFirstI = daoInterface.method(JMod.NONE, beanClass, "findFirst");
         JVar sql = findFirstI.param(String.class, "sql");
         JVar parameters = findFirstI.param(parameterSetter, "parameters");
@@ -322,7 +321,7 @@ public class JavaCodeGenerator implements CodeGenerator {
         generateCountRowsWithParameters(superDao, dataSource);
         generateExecuteUpdateDelete(superDao, parameterSetter, dataSource);
 
-        generateExecuteQueryT(superDao, parameterSetter, beanListClass, beanArrayListClass, connectionT);
+        generateExecuteQueryT(superDao, parameterSetter, beanListClass, beanLinkedListClass, connectionT);
         generateExecuteInsertT(superDao, parameterSetter, idSetter, connectionT);
         generateCountT(superDao, connectionT);
         generateExecuteUpdateDeleteT(superDao, parameterSetter, connectionT);
@@ -331,19 +330,22 @@ public class JavaCodeGenerator implements CodeGenerator {
         return superDao;
     }
 
-    private void generateExecuteQueryWithRowMap(JDefinedClass superDao, JDefinedClass parameterSetter, JClass beanArrayListClass, JFieldVar dataSource, JDefinedClass rowMapper) {
+    private void generateExecuteQueryWithRowMap(JDefinedClass superDao, JDefinedClass parameterSetter, JFieldVar dataSource, JDefinedClass rowMapper) {
 
         JMethod executeQuery = superDao.method(JMod.PUBLIC, Object.class, "executeQuery");
         JTypeVar m = executeQuery.generify("M");
 
-        JClass resultListType= codeModel.ref(ArrayList.class).narrow(m);
+        JClass linkedListClass = codeModel.ref(LinkedList.class);
+        JClass beanLinkedListClass = linkedListClass.narrow(m);
+        
+        JClass resultListType= codeModel.ref(List.class).narrow(m);
         executeQuery.type(resultListType);
         JVar sql = executeQuery.param(String.class, "sql");
         JVar parameters = executeQuery.param(parameterSetter, "parameters");
         JVar mapper = executeQuery.param(rowMapper.narrow(m), "rowMapper");
 
         JBlock body = executeQuery.body();
-        JVar resultList = body.decl(resultListType, "result", JExpr._new(resultListType));
+        JVar resultList = body.decl(resultListType, "result", JExpr._new(beanLinkedListClass));
 
         JVar connection = executeQuery.body().decl(codeModel.ref(Connection.class), "connection", JExpr._null());
         JTryBlock tryBlock = executeQuery.body()._try();
@@ -388,13 +390,13 @@ public class JavaCodeGenerator implements CodeGenerator {
     }
 
 
-    private void generateFindFirst(JDefinedClass superDao, JDefinedClass parameterSetter, JFieldVar dataSource, JClass beanArrayListClass, JTypeVar beanClass) {
+    private void generateFindFirst(JDefinedClass superDao, JDefinedClass parameterSetter, JFieldVar dataSource, JClass beanListClass, JTypeVar beanClass) {
         JMethod findFirstMethod = superDao.method(JMod.PUBLIC, beanClass, "findFirst");
         JVar sql = findFirstMethod.param(String.class, "sql");
         JVar parameters = findFirstMethod.param(parameterSetter, "parameters");
         JBlock body = findFirstMethod.body();
 
-        JVar result = body.decl(beanArrayListClass, "result", body.invoke("executeQuery").arg(sql).arg(parameters));
+        JVar result = body.decl(beanListClass, "result", body.invoke("executeQuery").arg(sql).arg(parameters));
         JConditional isEmpty = body._if(result.invoke("isEmpty"));
         isEmpty._then()._return(JExpr._null());
         isEmpty._else()._return(result.invoke("get").arg(JExpr.lit(0)));
@@ -617,12 +619,12 @@ public class JavaCodeGenerator implements CodeGenerator {
         insertQuery.body().add(statement.invoke("close"));
     }    
     
-    private void generateExecuteQuery(JDefinedClass superDao, JDefinedClass parameterSetter, JClass beanArrayListClass,
+    private void generateExecuteQuery(JDefinedClass superDao, JDefinedClass parameterSetter, JClass beanListClass, JClass beanLinkedListClass,
                                       JFieldVar dataSource) {
-        JMethod executeQuery = superDao.method(JMod.PUBLIC, beanArrayListClass, "executeQuery");
+        JMethod executeQuery = superDao.method(JMod.PUBLIC, beanListClass, "executeQuery");
         JVar sql = executeQuery.param(String.class, "sql");
         JVar parameters = executeQuery.param(parameterSetter, "parameters");
-        JVar result = executeQuery.body().decl(beanArrayListClass, "result", JExpr._new(beanArrayListClass));
+        JVar result = executeQuery.body().decl(beanListClass, "result", JExpr._new(beanLinkedListClass));
         JVar connection = executeQuery.body().decl(codeModel.ref(Connection.class), "connection", JExpr._null());
         JTryBlock tryBlock = executeQuery.body()._try();
 
@@ -663,13 +665,13 @@ public class JavaCodeGenerator implements CodeGenerator {
     }
 
     private void generateExecuteQueryT(JDefinedClass superDao, JDefinedClass parameterSetter,
-    		JClass beanListClass, JClass beanArrayListClass, JFieldVar connectionT) {
+    		JClass beanListClass, JClass beanLinkedListClass, JFieldVar connectionT) {
     	
 		JMethod executeQuery = superDao.method(JMod.PROTECTED, beanListClass, "executeQueryT");
 		executeQuery._throws(SQLException.class);
 		JVar sql = executeQuery.param(String.class, "sql");
 		JVar parameters = executeQuery.param(parameterSetter, "parameters");
-		JVar result = executeQuery.body().decl(beanListClass, "result", JExpr._new(beanArrayListClass));
+		JVar result = executeQuery.body().decl(beanListClass, "result", JExpr._new(beanLinkedListClass));
 		
 		JInvocation prepareStatement = connectionT.invoke("prepareStatement");
 		prepareStatement.arg(sql);
@@ -847,13 +849,8 @@ public class JavaCodeGenerator implements CodeGenerator {
         }
 
         queryInvocation.arg(JExpr._new(parameterSetter));
-        JClass beanList = null;
-        if (!methodT) {
-        	beanList = codeModel.ref(ArrayList.class).narrow(bean);
-        }
-        else {
-        	beanList = codeModel.ref(List.class).narrow(bean);
-        }
+        JClass beanList = codeModel.ref(List.class).narrow(bean);
+       	beanList = codeModel.ref(List.class).narrow(bean);
 
         JVar result = findByPrimaryKey.body().decl(beanList, "result", queryInvocation);
         JConditional isEmpty = findByPrimaryKey.body()._if(result.invoke("isEmpty"));
@@ -1143,15 +1140,13 @@ public class JavaCodeGenerator implements CodeGenerator {
     }
 
     private void generateFindAll(Table table, JDefinedClass dao, JDefinedClass bean, boolean methodT) {
-        JClass arrayListClass = codeModel.ref(ArrayList.class);
-        JClass beanArrayListClass = arrayListClass.narrow(bean);
         JClass listClass = codeModel.ref(List.class);
         JClass beanListClass = listClass.narrow(bean);
         
         JMethod findAll = null;
         JInvocation queryInvocation = null;
         if (!methodT) {
-        	findAll = dao.method(JMod.PUBLIC, beanArrayListClass, "findAll");
+        	findAll = dao.method(JMod.PUBLIC, beanListClass, "findAll");
         	queryInvocation = JExpr.invoke("executeQuery");
         }
         else {
@@ -1165,14 +1160,12 @@ public class JavaCodeGenerator implements CodeGenerator {
     }
 
     private void generateFindAllLimit(Table table, JDefinedClass dao, JDefinedClass bean, boolean methodT) {
-        JClass arrayListClass = codeModel.ref(ArrayList.class);
-        JClass beanArrayListClass = arrayListClass.narrow(bean);
         JClass listClass = codeModel.ref(List.class);
         JClass beanListClass = listClass.narrow(bean);        
         
         JMethod findAll = null;
         if (!methodT) {
-        	findAll = dao.method(JMod.PUBLIC, beanArrayListClass, "findAll");
+        	findAll = dao.method(JMod.PUBLIC, beanListClass, "findAll");
         }
         else {
         	findAll = dao.method(JMod.PUBLIC, beanListClass, "findAllT");
